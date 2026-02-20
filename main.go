@@ -6060,6 +6060,8 @@ func parseTTYKeyStream(raw string) ([]int, string) {
 						keys = append(keys, keyPgUp)
 					case "6":
 						keys = append(keys, keyPgDn)
+					case "0", "1", "2", "3", "4", "7", "8", "9":
+						keys = append(keys, int(param[0]))
 					}
 					i = j + 1
 					continue
@@ -6379,6 +6381,16 @@ func (rt *runtimeState) invokeBoundCommand(fn *golisp.Data, env *golisp.SymbolTa
 
 func (rt *runtimeState) handleKey(key int, env *golisp.SymbolTableFrame) bool {
 	if rt.dispatchViaCurrentKeymap(key, env) {
+		return false
+	}
+	// Some terminals encode keypad "2" as control-B (2). Keep this local
+	// to pong so numeric paddle controls remain usable without affecting
+	// other games/keymaps.
+	if rt.gameName == "pong" && key == 2 {
+		if err := rt.callFirst([]string{"pong-move-down"}, env); err != nil {
+			rt.messages = append(rt.messages, err.Error())
+			rt.warnf("pong fallback key handler error: %v", err)
+		}
 		return false
 	}
 

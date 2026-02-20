@@ -1,4 +1,4 @@
-The .el files are under the same license as Emacs.
+The .el files have their own license at the top of the files.
 This license is only for main.go and the rest of the files.
 
 BSD 3-Clause License

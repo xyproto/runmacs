@@ -1,0 +1,8 @@
+- [ ] Verify and finalize `dunnet.el` interactive input handling end-to-end in a real TTY (`look` + `RET` should parse and respond)
+- [x] `cookie1.el`: add an interactive smoke entrypoint (or demo command) so standalone execution does something visible instead of quitting
+- [x] `gamegrid.el`: provide a standalone demo/test entrypoint (library currently exits immediately by design)
+- [x] `gametree.el`: provide a standalone demo/test entrypoint (library currently exits immediately by design)
+- [x] `handwrite.el`: make standalone invocation run a visible interaction loop rather than return immediately
+- [x] `hanoi.el`: ensure standalone invocation keeps an interaction loop active (or explicitly starts demo/play mode)
+- [x] `morse.el`: select a better default standalone entrypoint than `morse-region` so `go run . morse.el` is interactive
+- [x] `studly.el`: select/implement a standalone entrypoint that works without preselected region text

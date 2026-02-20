@@ -5959,6 +5959,7 @@ func runGameLoop(rt *runtimeState, env *golisp.SymbolTableFrame) error {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	go func() {
+		pending := ""
 		for {
 			select {
 			case <-stopCh:
@@ -5969,7 +5970,8 @@ func runGameLoop(rt *runtimeState, env *golisp.SymbolTableFrame) error {
 			if raw == "" {
 				continue
 			}
-			keys, _ := parseTTYKeyStream(raw)
+			keys, rest := parseTTYKeyStream(pending + raw)
+			pending = rest
 			for _, k := range keys {
 				select {
 				case keyCh <- k:
@@ -6009,7 +6011,7 @@ func parseTTYKeyStream(raw string) ([]int, string) {
 	}
 	if after, ok := strings.CutPrefix(raw, "c:"); ok {
 		if n, err := strconv.Atoi(after); err == nil && n > 0 {
-			return []int{n}, ""
+			return []int{normalizeVTKeyCode(n)}, ""
 		}
 	}
 
@@ -6061,6 +6063,19 @@ func parseTTYKeyStream(raw string) ([]int, string) {
 					}
 					i = j + 1
 					continue
+				case 'u':
+					// CSI-u extension: ESC [ <codepoint> ; ... u
+					param := raw[i+2 : j]
+					if param != "" {
+						if head, _, ok := strings.Cut(param, ";"); ok {
+							param = head
+						}
+						if cp, err := strconv.Atoi(param); err == nil && cp > 0 {
+							keys = append(keys, normalizeVTKeyCode(cp))
+						}
+					}
+					i = j + 1
+					continue
 				default:
 					// Unknown CSI; consume it.
 					i = j + 1
@@ -6081,6 +6096,27 @@ func parseTTYKeyStream(raw string) ([]int, string) {
 					keys = append(keys, keyRight)
 				case 'D':
 					keys = append(keys, keyLeft)
+				// Keypad digits in application mode (SS3).
+				case 'p':
+					keys = append(keys, int('0'))
+				case 'q':
+					keys = append(keys, int('1'))
+				case 'r':
+					keys = append(keys, int('2'))
+				case 's':
+					keys = append(keys, int('3'))
+				case 't':
+					keys = append(keys, int('4'))
+				case 'u':
+					keys = append(keys, int('5'))
+				case 'v':
+					keys = append(keys, int('6'))
+				case 'w':
+					keys = append(keys, int('7'))
+				case 'x':
+					keys = append(keys, int('8'))
+				case 'y':
+					keys = append(keys, int('9'))
 				}
 				i += 3
 				continue
@@ -6117,6 +6153,26 @@ func parseTTYKeyStream(raw string) ([]int, string) {
 		i += size
 	}
 	return keys, ""
+}
+
+func normalizeVTKeyCode(k int) int {
+	switch k {
+	// Common terminal key codes seen from VT backends.
+	case 258:
+		return keyDown
+	case 259:
+		return keyUp
+	case 260:
+		return keyLeft
+	case 261:
+		return keyRight
+	case 338:
+		return keyPgDn
+	case 339:
+		return keyPgUp
+	default:
+		return k
+	}
 }
 
 func runHeadlessLoop(rt *runtimeState, env *golisp.SymbolTableFrame) error {
@@ -6554,6 +6610,23 @@ func prettyKeyName(k string) string {
 	}
 }
 
+func prettyActionNameForGame(gameName, fnName string) string {
+	// Pong's function names are historical and don't match movement direction.
+	if gameName == "pong" {
+		switch fnName {
+		case "pong-move-left":
+			return "p1 up"
+		case "pong-move-right":
+			return "p1 down"
+		case "pong-move-up":
+			return "p2 up"
+		case "pong-move-down":
+			return "p2 down"
+		}
+	}
+	return prettyActionName(fnName)
+}
+
 func prettyActionName(fnName string) string {
 	n := strings.ToLower(fnName)
 	switch {
@@ -6609,7 +6682,7 @@ func (rt *runtimeState) statusFromCurrentKeymap() (string, bool) {
 			return
 		}
 		fnName, _ := resolveKeyBinding(b, rt.env)
-		label := fmt.Sprintf("%s %s", prettyKeyName(key), prettyActionName(fnName))
+		label := fmt.Sprintf("%s %s", prettyKeyName(key), prettyActionNameForGame(rt.gameName, fnName))
 		if !seen[label] {
 			seen[label] = true
 			tokens = append(tokens, label)

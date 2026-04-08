@@ -5966,7 +5966,7 @@ func runGameLoop(rt *runtimeState, env *golisp.SymbolTableFrame) error {
 				return
 			default:
 			}
-			raw := tty.CustomString()
+			raw := tty.String()
 			if raw == "" {
 				continue
 			}
